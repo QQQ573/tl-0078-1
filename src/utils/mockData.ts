@@ -24,6 +24,11 @@ export interface BrandAvg {
   makeMedianAvg: number;
 }
 
+export interface BacklogRule {
+  multiplier: number;
+  consecutive: number;
+}
+
 export interface StoreAggregated {
   storeId: string;
   store: Store;
@@ -100,7 +105,7 @@ function generatePendingOrders(brand: Brand, count: number): string[] {
     '奈雪': 'NX',
     '蜜雪冰城': 'MX',
   };
-  return Array.from({ length: count }, (_, i) => `${prefixes[brand]}-${rand(100, 999)}`);
+  return Array.from({ length: count }, () => `${prefixes[brand]}-${rand(100, 999)}`);
 }
 
 export function generateMockData(dateSeed: string): TimeSlotData[] {
@@ -167,7 +172,8 @@ export function computeBrandAverages(data: TimeSlotData[]): BrandAvg[] {
 export function aggregateStoreData(
   data: TimeSlotData[],
   brandAvgs: BrandAvg[],
-  timeRange: [number, number]
+  timeRange: [number, number],
+  backlogRule: BacklogRule = { multiplier: 1.5, consecutive: 3 }
 ): StoreAggregated[] {
   return STORES.map(store => {
     const storeData = data.filter(d => {
@@ -190,19 +196,7 @@ export function aggregateStoreData(
       ? Math.round(storeData.reduce((s, d) => s + d.pickupMedian, 0) / storeData.length)
       : 0;
 
-    const backlogSlots: string[] = [];
-    let consecutiveCount = 0;
-    for (const d of storeData) {
-      const avg = brandAvgs.find(a => a.brand === store.brand && a.timeSlot === d.timeSlot);
-      if (avg && d.makeMedian > avg.makeMedianAvg * 1.5) {
-        consecutiveCount++;
-        if (consecutiveCount >= 3) {
-          backlogSlots.push(d.timeSlot);
-        }
-      } else {
-        consecutiveCount = 0;
-      }
-    }
+    const backlogSlots = getBacklogSlotsForStore(store.brand, storeData, brandAvgs, backlogRule);
 
     const isBacklog = backlogSlots.length > 0;
     const pendingOrders = storeData
@@ -223,4 +217,31 @@ export function aggregateStoreData(
       pendingOrders,
     };
   });
+}
+
+export function getBacklogSlotsForStore(
+  brand: Brand,
+  storeData: TimeSlotData[],
+  brandAvgs: BrandAvg[],
+  rule: BacklogRule
+): string[] {
+  const multiplier = Number.isFinite(rule.multiplier) ? rule.multiplier : 1.5;
+  const consecutive = Math.max(2, Math.min(6, Math.floor(rule.consecutive || 3)));
+
+  const sorted = [...storeData].sort((a, b) => TIME_SLOTS.indexOf(a.timeSlot) - TIME_SLOTS.indexOf(b.timeSlot));
+
+  const backlogSlots: string[] = [];
+  let consecutiveCount = 0;
+  for (const d of sorted) {
+    const avg = brandAvgs.find(a => a.brand === brand && a.timeSlot === d.timeSlot);
+    if (avg && d.makeMedian > avg.makeMedianAvg * multiplier) {
+      consecutiveCount++;
+      if (consecutiveCount >= consecutive) {
+        backlogSlots.push(d.timeSlot);
+      }
+    } else {
+      consecutiveCount = 0;
+    }
+  }
+  return backlogSlots;
 }

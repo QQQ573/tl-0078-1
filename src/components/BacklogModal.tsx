@@ -1,5 +1,5 @@
 import { useDashboardStore } from '@/store/useDashboardStore';
-import { STORES, BRAND_COLORS, TIME_SLOTS } from '@/utils/mockData';
+import { STORES, BRAND_COLORS, TIME_SLOTS, getBacklogSlotsForStore } from '@/utils/mockData';
 import { X, Clock, Coffee, ShoppingBag } from 'lucide-react';
 
 export default function BacklogModal() {
@@ -8,6 +8,7 @@ export default function BacklogModal() {
   const mockData = useDashboardStore(s => s.mockData);
   const timeRange = useDashboardStore(s => s.timeRange);
   const brandAvgs = useDashboardStore(s => s.brandAvgs);
+  const backlogRule = useDashboardStore(s => s.backlogRule);
   const exemptRainy = useDashboardStore(s => s.exemptRainy);
   const exemptExhibition = useDashboardStore(s => s.exemptExhibition);
   const isExempt = exemptRainy || exemptExhibition;
@@ -24,21 +25,8 @@ export default function BacklogModal() {
 
   const brandColor = BRAND_COLORS[store.brand];
 
-  const consecutiveBacklogSlots: string[] = [];
-  let consecutiveCount = 0;
-  for (const d of storeData) {
-    const avg = brandAvgs.find(a => a.brand === store.brand && a.timeSlot === d.timeSlot);
-    if (avg && d.makeMedian > avg.makeMedianAvg * 1.5) {
-      consecutiveCount++;
-      if (consecutiveCount >= 3) {
-        consecutiveBacklogSlots.push(d.timeSlot);
-      }
-    } else {
-      consecutiveCount = 0;
-    }
-  }
-
-  const backlogEntries = storeData.filter(d => consecutiveBacklogSlots.includes(d.timeSlot));
+  const backlogSlots = getBacklogSlotsForStore(store.brand, storeData, brandAvgs, backlogRule);
+  const backlogEntries = storeData.filter(d => backlogSlots.includes(d.timeSlot));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#00000088] backdrop-blur-sm" onClick={closeBacklogModal}>
@@ -50,7 +38,7 @@ export default function BacklogModal() {
           <div>
             <h3 className="text-sm font-semibold text-[#E0E8F0]">{store.name} · 后厨积压</h3>
             <p className="text-[10px] text-[#6B7A99] mt-0.5">
-              制作时长超过同品牌均值 50% 的时段
+              制作时长超过同品牌均值 {Math.round((backlogRule.multiplier - 1) * 100)}% 且连续 ≥ {backlogRule.consecutive} 个时段
             </p>
           </div>
           <button onClick={closeBacklogModal} className="p-1 hover:bg-[#1B2B44] rounded transition-colors">

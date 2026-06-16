@@ -16,7 +16,6 @@ export default function Timeline() {
   const [dragStartRange, setDragStartRange] = useState<[number, number]>([0, 0]);
 
   const slotToX = (slot: number) => slot * SLOT_WIDTH;
-  const xToSlot = (x: number) => Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.round(x / SLOT_WIDTH)));
 
   const handleMouseDown = useCallback((e: React.MouseEvent, type: 'start' | 'end' | 'move') => {
     e.preventDefault();

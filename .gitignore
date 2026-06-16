@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (never commit secrets)
+.env
+.env.*
+
+# Test coverage
+coverage
+*.lcov
+
+# Tooling caches
+.turbo
+.cache
+.eslintcache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
